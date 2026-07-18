@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "video": {
+      "title": "Video",
+      "description": "A user-uploaded video",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "username": { "type": "string" },
+        "caption": { "type": "string" },
+        "likes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["url", "username", "ownerId", "createdAt"]
+    },
+    "comment": {
+      "title": "Comment",
+      "description": "A comment on a video",
+      "type": "object",
+      "properties": {
+        "videoId": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["videoId", "userId", "username", "text", "createdAt"]
+    },
+    "like": {
+      "title": "Like",
+      "description": "Like status for a video by a user",
+      "type": "object",
+      "properties": {
+        "videoId": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["videoId", "userId"]
+    }
+  },
+  "firestore": {
+    "/videos/{videoId}": {
+      "schema": "video",
+      "description": "Collection of videos"
+    },
+    "/videos/{videoId}/likes/{userId}": {
+      "schema": "like",
+      "description": "Likes subcollection for videos"
+    },
+    "/videos/{videoId}/comments/{commentId}": {
+      "schema": "comment",
+      "description": "Comments subcollection for videos"
+    }
+  }
+}

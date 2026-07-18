@@ -1,7 +1,7 @@
 {
   "name": "Video Feed",
   "description": "A TikTok-style vertical video feed prototype.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
 

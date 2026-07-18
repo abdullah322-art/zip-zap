@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isValidVideo(data) {
+        return data.url is string && data.url.size() <= 2048 &&
+               data.username is string && data.username.size() <= 64 &&
+               data.caption is string && data.caption.size() <= 256 &&
+               data.likes is number && data.likes >= 0 &&
+               data.ownerId is string && data.ownerId.size() <= 128 &&
+               data.createdAt is string && data.createdAt.size() <= 32;
+    }
+
+    match /videos/{videoId} {
+        allow read: if true; // Allow public read
+        allow create: if isSignedIn() && isValidVideo(request.resource.data) && request.resource.data.ownerId == request.auth.uid;
+        allow update: if isSignedIn() && isValidVideo(request.resource.data) && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) &&
+                      (request.resource.data.likes == resource.data.likes + 1 || request.resource.data.likes == resource.data.likes - 1);
+        allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+        match /likes/{userId} {
+            allow read: if isSignedIn();
+            allow create: if isSignedIn() && isOwner(userId) && request.resource.data.videoId == videoId;
+            allow delete: if isSignedIn() && isOwner(userId);
+        }
+        
+        match /comments/{commentId} {
+            allow read: if true;
+            allow create: if isSignedIn();
+        }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
