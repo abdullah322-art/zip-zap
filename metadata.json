@@ -1,6 +1,6 @@
 {
-  "name": "Video Feed",
-  "description": "A TikTok-style vertical video feed prototype.",
+  "name": "ZIP ZAP",
+  "description": "A ZIP ZAP-style vertical video feed prototype.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -27,6 +27,16 @@
       },
       "required": ["videoId", "userId", "username", "text", "createdAt"]
     },
+    "following": {
+      "title": "Following",
+      "description": "User followed by another user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "creatorId": { "type": "string" }
+      },
+      "required": ["userId", "creatorId"]
+    },
     "like": {
       "title": "Like",
       "description": "Like status for a video by a user",
@@ -50,6 +60,10 @@
     "/videos/{videoId}/comments/{commentId}": {
       "schema": "comment",
       "description": "Comments subcollection for videos"
+    },
+    "/users/{userId}/following/{creatorId}": {
+      "schema": "following",
+      "description": "Users followed by this user"
     }
   }
 }

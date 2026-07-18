@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Heart, MessageCircle, Share2, Music2, LogIn, User, Camera, Trash2, X, Send, Search} from 'lucide-react';
+import {Heart, MessageCircle, Share2, Music2, LogIn, User, Camera, Trash2, X, Send, Search, Home, Compass, Users, Video, Mail, Bell, MoreHorizontal, Bookmark, Plus} from 'lucide-react';
 import {useState, useEffect, useCallback, useRef} from 'react';
 import {auth, db} from './firebase';
 import {signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged} from 'firebase/auth';
 import type {User as FirebaseUser} from 'firebase/auth';
-import {collection, query, orderBy, limit, startAfter, getDocs, addDoc, doc, runTransaction, getDoc, deleteDoc, DocumentData, QueryDocumentSnapshot} from 'firebase/firestore';
+import {collection, query, orderBy, limit, startAfter, getDocs, addDoc, doc, runTransaction, getDoc, deleteDoc, DocumentData, QueryDocumentSnapshot, increment, updateDoc, setDoc} from 'firebase/firestore';
 
 type Video = {
   id: string;
@@ -16,6 +16,7 @@ type Video = {
   username: string;
   caption: string;
   likes: number;
+  viewCount: number;
   ownerId: string;
 };
 
@@ -65,6 +66,21 @@ function AuthButton() {
 
 function VideoCard({video, user, onCommentClick}: {video: Video; user: FirebaseUser | null; onCommentClick: (video: Video) => void}) {
   const [liked, setLiked] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const videoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                updateDoc(doc(db, 'videos', video.id), {viewCount: increment(1)});
+            }
+        });
+    }, {threshold: 1.0});
+
+    if (videoRef.current) observer.observe(videoRef.current);
+    return () => observer.disconnect();
+  }, [video.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -72,8 +88,13 @@ function VideoCard({video, user, onCommentClick}: {video: Video; user: FirebaseU
       const likeDoc = await getDoc(doc(db, 'videos', video.id, 'likes', user.uid));
       setLiked(likeDoc.exists());
     };
+    const checkFollowing = async () => {
+        const followDoc = await getDoc(doc(db, 'users', user.uid, 'following', video.ownerId));
+        setIsFollowing(followDoc.exists());
+    };
     checkLiked();
-  }, [video.id, user]);
+    checkFollowing();
+  }, [video.id, video.ownerId, user]);
 
   const handleLike = async () => {
     if (!user) return;
@@ -96,48 +117,89 @@ function VideoCard({video, user, onCommentClick}: {video: Video; user: FirebaseU
     }
   };
 
+  const handleFollow = async () => {
+      if (!user) return;
+      const followRef = doc(db, 'users', user.uid, 'following', video.ownerId);
+      if (isFollowing) {
+          await deleteDoc(followRef);
+      } else {
+          await setDoc(followRef, {userId: user.uid, creatorId: video.ownerId});
+      }
+      setIsFollowing(!isFollowing);
+  };
+
   return (
-    <div className="relative h-screen w-full snap-start flex items-center justify-center bg-black">
+    <div ref={videoRef} className="relative h-[80vh] w-full snap-start flex gap-4">
       <video
         src={video.url}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover rounded-lg bg-black"
         loop
         muted
         autoPlay
         playsInline
       />
       
-      {/* Overlay */}
-      <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/60 to-transparent">
-        <h3 className="text-white font-bold text-lg">{video.username}</h3>
+      {/* Interaction Column */}
+      <div className="flex flex-col gap-4 justify-end pb-10">
+        <button onClick={handleLike} className="flex flex-col items-center">
+            <Heart size={32} className={liked ? "fill-zip-red text-zip-red" : ""} />
+            <span className="text-xs">{video.likes}</span>
+        </button>
+        <button onClick={() => onCommentClick(video)} className="flex flex-col items-center">
+            <MessageCircle size={32} />
+        </button>
+        <button className="flex flex-col items-center">
+            <Bookmark size={32} />
+        </button>
+        <button className="flex flex-col items-center">
+            <Share2 size={32} />
+        </button>
+      </div>
+
+      {/* Overlay Caption */}
+      <div className="absolute bottom-10 left-4">
+        <div className="flex items-center gap-2">
+            <h3 className="text-white font-bold text-lg">{video.username}</h3>
+            {user && user.uid !== video.ownerId && (
+                <button onClick={handleFollow} className="text-xs bg-zip-red text-white px-2 py-1 rounded">
+                    {isFollowing ? 'Following' : 'Follow'}
+                </button>
+            )}
+        </div>
         <p className="text-white text-sm">{video.caption}</p>
         <div className="flex items-center gap-2 text-white/80 mt-2 text-sm">
           <Music2 size={16} />
           <span>Original sound - {video.username}</span>
+          <span className="ml-auto">{video.viewCount} views</span>
         </div>
-      </div>
-
-      <div className="absolute bottom-20 right-4 flex flex-col gap-6">
-        <button onClick={handleLike} className="flex flex-col items-center text-white">
-            <Heart size={32} className={liked ? "fill-red-500 text-red-500" : "fill-white"} />
-            <span className="text-xs mt-1">{video.likes}</span>
-        </button>
-        <button onClick={() => onCommentClick(video)} className="flex flex-col items-center text-white">
-            <MessageCircle size={32} />
-        </button>
-        <ActionButton icon={Share2} label="Share" />
       </div>
     </div>
   );
 }
 
-function ActionButton({icon: Icon, label}: {icon: any; label: string}) {
-  return (
-    <button className="flex flex-col items-center text-white">
-      <Icon size={32} className="fill-white" />
-      <span className="text-xs mt-1">{label}</span>
-    </button>
-  );
+function Sidebar() {
+    const items = [
+        {icon: Home, label: 'For You'},
+        {icon: Compass, label: 'Explore'},
+        {icon: Users, label: 'Following'},
+        {icon: Users, label: 'Friends'},
+        {icon: Video, label: 'LIVE'},
+        {icon: Mail, label: 'Messages'},
+        {icon: Bell, label: 'Activity'},
+        {icon: Plus, label: 'Upload'},
+        {icon: User, label: 'Profile'},
+        {icon: MoreHorizontal, label: 'More'},
+    ];
+    return (
+        <aside className="w-60 h-screen fixed left-0 top-16 p-4 border-r border-gray-800 overflow-y-auto bg-black z-20">
+            {items.map(item => (
+                <div key={item.label} className="flex items-center gap-4 p-3 hover:bg-gray-900 rounded-lg cursor-pointer">
+                    <item.icon size={24} />
+                    <span className="font-semibold text-lg">{item.label}</span>
+                </div>
+            ))}
+        </aside>
+    );
 }
 
 function CommentsModal({video, onClose, user}: {video: Video; onClose: () => void; user: FirebaseUser | null}) {
@@ -259,6 +321,7 @@ export default function App() {
       username: user.displayName || 'Anonymous',
       caption: 'New video!',
       likes: 0,
+      viewCount: 0,
       createdAt: new Date().toISOString(),
       ownerId: user.uid
     });
@@ -270,32 +333,41 @@ export default function App() {
   );
 
   return (
-    <div ref={scrollRef} onScroll={handleScroll} className="h-screen w-full snap-y snap-mandatory overflow-y-scroll bg-black pt-16">
-      <div className="fixed top-0 left-0 w-full p-2 bg-black/80 z-30 flex items-center">
-        <Search className="text-white ml-2" />
-        <input 
-            className="flex-1 bg-transparent text-white p-2 ml-2 outline-none" 
-            placeholder="Search..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-        />
+    <div className="h-screen w-full bg-black text-white">
+      {/* Navbar */}
+      <nav className="fixed top-0 left-0 w-full bg-black p-4 border-b border-gray-800 flex justify-between items-center z-40">
+        <h1 className="text-2xl font-bold text-zip-blue">ZIP ZAP</h1>
+        <div className="relative w-96">
+            <Search className="absolute left-2 top-2.5 text-gray-400" />
+            <input 
+                className="w-full bg-gray-900 p-2 pl-10 rounded-full" 
+                placeholder="Search..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-4">
+            {user && (
+                <label className="cursor-pointer text-zip-red">
+                    <Plus size={24} />
+                    <input type="file" accept="video/*" capture="environment" className="hidden" onChange={handleCapture} />
+                </label>
+            )}
+            <AuthButton />
+        </div>
+      </nav>
+
+      {/* Main Layout */}
+      <div className="pt-20 flex px-4">
+        <Sidebar />
+        <main ref={scrollRef} onScroll={handleScroll} className="flex-1 ml-60 h-[calc(100vh-80px)] overflow-y-scroll snap-y snap-mandatory px-20">
+            {filteredVideos.map((video) => (
+                <VideoCard key={video.id} video={video} user={user} onCommentClick={setCurrentVideo} />
+            ))}
+        </main>
       </div>
-      <AuthButton />
-      {user && (
-        <>
-            <label className="absolute top-4 left-4 text-white p-2 rounded-full bg-black/50 z-20 cursor-pointer">
-                <Camera size={24} />
-                <input type="file" accept="video/*" capture="environment" className="hidden" onChange={handleCapture} />
-            </label>
-            <button onClick={() => setIsDrawerOpen(true)} className="absolute top-16 left-4 text-white p-2 rounded-full bg-black/50 z-20">
-                <User size={24} />
-            </button>
-            {isDrawerOpen && <ProfileDrawer videos={videos} onClose={() => setIsDrawerOpen(false)} user={user} />}
-        </>
-      )}
-      {filteredVideos.map((video) => (
-        <VideoCard key={video.id} video={video} user={user} onCommentClick={setCurrentVideo} />
-      ))}
+      
+      {isDrawerOpen && user && <ProfileDrawer videos={videos} onClose={() => setIsDrawerOpen(false)} user={user} />}
       {currentVideo && <CommentsModal video={currentVideo} onClose={() => setCurrentVideo(null)} user={user} />}
     </div>
   );
